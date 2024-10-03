@@ -32,3 +32,29 @@ create table  bot_handler (
 
 - 추후 발전 가능성 있는 Schema 형태이다.
 - 예를들면, Image 정보등을 Type을 통해서 핸들링 하는 형태를 생각하고 작성하였다.
+
+<h1> DisCord Complex </h1>
+
+아무래도 Discord의 복잡한 메시지 프로토콜을 따라주며 작업이 들어가야 한다.
+그러다보니 각각 메시지마다 원하는 타입을 선언하고, 언마살하면 사용을 하는 방향으로 작업이 되었다.
+
+```
+{
+    "content": "This is a message with components",
+    "components": [
+        {
+            "type": 1,
+            "components": [
+                {
+                    "type": 2,
+                    "label": "Click me!",
+                    "style": 1,
+                    "custom_id": "click_one"
+                }
+            ]
+
+        }
+    ]
+}
+```
+- 이러한 형태에 대해서, `type/bot/helloBotChannel`과 같이 선언해서 사용하게 된다.
