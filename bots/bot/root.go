@@ -1,9 +1,9 @@
 package bot
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/04Akaps/Scalable_Discord_bot/bots/utils"
+	"github.com/04Akaps/Scalable_Discord_bot/bots/bot/complex"
+	"github.com/04Akaps/Scalable_Discord_bot/bots/bot/message"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
 	"time"
@@ -22,6 +22,9 @@ type Bot struct {
 	info    *BotInfo
 	handler map[string]*BotHandler
 	log     *zap.Logger
+
+	messageHandler message.Handler
+	complexHandler complex.Handler
 }
 
 func NewBot(
@@ -34,6 +37,9 @@ func NewBot(
 		handler: handler,
 		log:     log,
 	}
+
+	b.messageHandler = message.NewMessageHandler()
+	b.complexHandler = complex.NewComplexHandler()
 
 	b.RunBot()
 
@@ -63,7 +69,6 @@ func (b *Bot) RunBot() {
 	}
 
 	defer sess.Close()
-	utils.RunWork.Done()
 
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -82,12 +87,7 @@ func (b *Bot) addHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	b.handleRequest(m.Content, s, m)
-}
-
-func (b *Bot) handleRequest(msg string, s *discordgo.Session, m *discordgo.MessageCreate) {
-
-	info, ok := b.handler[msg]
+	info, ok := b.handler[m.Content]
 
 	if !ok {
 		return
@@ -95,59 +95,11 @@ func (b *Bot) handleRequest(msg string, s *discordgo.Session, m *discordgo.Messa
 
 	switch info.Type {
 	case MESSAGE:
-		b.handleMessageType(info, s, m)
+		b.messageHandler.HandleMessage(b.log, info, s, m)
 		return
-
 	case MESSAGE_COMPLEX:
-		b.handleComplexType(info, s, m)
+		b.complexHandler.HandleMessage(b.log, info, s, m)
 		return
 	}
 
-}
-
-func (b *Bot) handleMessageType(info *BotHandler, s *discordgo.Session, m *discordgo.MessageCreate) {
-	switch info.ContentMatch {
-	case "!hello":
-		s.ChannelMessageSend(m.ChannelID, info.Message)
-		return
-	}
-}
-
-func (b *Bot) handleComplexType(info *BotHandler, s *discordgo.Session, m *discordgo.MessageCreate) {
-	switch info.ContentMatch {
-	case "!test":
-		var data TestCallType
-
-		if err := json.Unmarshal([]byte(info.Message), &data); err != nil {
-			b.log.Error("Failed to unmarshal", zap.Error(err))
-			return
-		}
-
-		embed := &discordgo.MessageEmbed{
-			Title:       "Example Title",
-			Description: data.Content,
-		}
-
-		var messageComponents []discordgo.MessageComponent
-
-		for _, comp := range data.Components {
-			for _, innerComp := range comp.Components {
-				messageComponents = append(messageComponents, discordgo.Button{
-					Label:    innerComp.Label,
-					Style:    discordgo.ButtonStyle(innerComp.Style),
-					CustomID: innerComp.CustomID,
-				})
-			}
-		}
-
-		if _, err := s.ChannelMessageSendComplex(
-			m.ChannelID,
-			&discordgo.MessageSend{
-				Content:    embed.Description,
-				Embed:      embed,
-				Components: []discordgo.MessageComponent{discordgo.ActionsRow{Components: messageComponents}}}); err != nil {
-			b.log.Error("Failed to send complex message", zap.Error(err))
-		}
-
-	}
 }

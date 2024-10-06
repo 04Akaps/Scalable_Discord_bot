@@ -20,6 +20,5 @@ func NewApp(cfg config.Config) {
 		panic(err)
 	}
 
-	bots := bots.NewBots(cfg, a.db)
-	bots.Run()
+	bots.RunBots(cfg, a.db)
 }

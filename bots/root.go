@@ -1,26 +1,24 @@
 package bots
 
 import (
-	"github.com/04Akaps/Scalable_Discord_bot/bots/utils"
-	"time"
-
 	"github.com/04Akaps/Scalable_Discord_bot/bots/bot"
 	"github.com/04Akaps/Scalable_Discord_bot/config"
 	"github.com/04Akaps/Scalable_Discord_bot/repository/db"
 	"go.uber.org/zap"
-
-	. "github.com/04Akaps/Scalable_Discord_bot/type/bot"
+	"runtime"
+	"time"
 )
 
 type Bots struct {
 	cfg config.Config
 
-	db   db.DatabaseImpl
-	bots map[string]*BotInfo
+	db db.DatabaseImpl
+
+	log *zap.Logger
 }
 
-func NewBots(cfg config.Config, db db.DatabaseImpl) Bots {
-	bs := Bots{cfg: cfg, db: db, bots: make(map[string]*BotInfo)}
+func RunBots(cfg config.Config, db db.DatabaseImpl) {
+	bs := Bots{cfg: cfg, db: db, log: cfg.Logger}
 
 	bots, err := bs.db.GetBotTotalInfo()
 
@@ -28,8 +26,6 @@ func NewBots(cfg config.Config, db db.DatabaseImpl) Bots {
 		bs.cfg.Logger.Error("Failed to get all bot info", zap.Error(err))
 		panic(err)
 	}
-
-	utils.RunWork.Add(len(bots))
 
 	for _, info := range bots {
 		// Left Join을 통해서 Handler 정보도 모두 가져 올 수 있지만, 데이터 양 자체가 그렇게 많지 않고,
@@ -42,28 +38,18 @@ func NewBots(cfg config.Config, db db.DatabaseImpl) Bots {
 			panic(err)
 		}
 
-		bs.bots[info.BotName] = info
 		go bot.NewBot(info, handler, cfg.Logger)
 	}
 
-	if len(bs.bots) == 0 {
-		panic("no bots for running")
-	}
-
-	utils.RunWork.Wait()
-
-	return bs
-}
-
-func (bs Bots) Run() {
-
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
+
+	bs.log.Info("Module is running.... ")
 
 	for {
 		select {
 		case <-ticker.C:
-			// TODO 쓸만한 로그 추가
+			bs.log.Info("", zap.Int("CPUs", runtime.NumCPU()), zap.Int("Goroutine", runtime.NumGoroutine()))
 		}
 	}
 
